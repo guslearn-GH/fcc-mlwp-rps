@@ -1,9 +1,14 @@
 # The example function below keeps track of the opponent's history and plays whatever the opponent played two plays ago. It is not a very good player so you will need to change the code to pass the challenge.
 import random
 import tensorflow as tf
-import keras
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+#rom tf.keras as keras
+keras = tf.keras
+# K = tensorflow._tf_uses_legacy_keras.backend
+# KL = tensorflow._tf_uses_legacy_keras.layers
+# Lambda, Input, Flatten = KL.Lambda, KL.Input, KL.Flatten
+# Model = tensorflow._tf_uses_legacy_keras.Model
+# from K.models import Sequential
+# from tensorflow.keras.layers import Dense
 #from keras.preprocessing import sequence
 
 import os
@@ -60,7 +65,7 @@ EMBEDDING_DIM=256
 RNN_UNITS=128;
 BUFFER_SIZE=1000;
 sequences = char_dataset.batch(BATCH_SIZE);
-print(sequences)
+print("len of sequences: ",len(sequences))
 # print(sequences[0:3])
 
 def split_input_target(chunk):
