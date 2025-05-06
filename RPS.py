@@ -11,21 +11,22 @@ import tensorflow as tf
 # from K.models import Sequential
 from tensorflow import python
 from tensorflow import zeros_initializer
-from tensorflow.python.keras.layers import Dense
+from tensorflow.keras import layers
 from tensorflow.python.keras import Sequential
 from tensorflow.python.keras import initializers
 
+
 import os
 import numpy as np
+from tensorflow import raw_ops
 from tensorflow.python.keras.saving.saved_model.serialized_attributes import recurrent
 from tensorflow.python.keras.saving.saved_model_experimental import sequential
 
-VOCAB_SIZE = 3;
-MAXLEN = 1;
-BATCH_SIZE = 32;
-text = "RPS";
-dev_oppo_hist = ["R","P","S","R","P","S","R","P","S"]
-vocab = dev_oppo_hist;
+#VOCAB_SIZE = 3;
+#text = "RPS";
+dev_oppo_hist = ["R","P","S","R","P","S","R","P","S","R","P","S"]
+vocab = sorted(set(dev_oppo_hist));
+VOCAB_SIZE = len(vocab);
 
 # print(keras.__version__)
 def player(prev_play, opponent_history=[]):
@@ -39,19 +40,18 @@ def player(prev_play, opponent_history=[]):
         #retrain model every 100 plays?
         return opponent_history[0]#begin model training, testing, predicting
 
-
-
 # Creating a mapping from unique characters to indices
-char2idx = {u:i for i, u in enumerate(vocab)}
-idx2char = np.array(vocab)
+char2idx = {u:i for i, u in enumerate(dev_oppo_hist)}
+idx2char = np.array(dev_oppo_hist)
 
-def text_to_int(text):
-  return np.array([char2idx[c] for c in text])
+def text_to_int(txt):
+  return np.array([char2idx[c] for c in txt])
 
-text_as_int = text_to_int(text)
-vocab_as_int = text_to_int(vocab)
-print("Text:", vocab)
-print("Encoded:", text_to_int(vocab))
+
+text_as_int = text_to_int(dev_oppo_hist)
+dev_oppo_hist_as_int = text_to_int(dev_oppo_hist)
+print("Text:", text_as_int)
+print("Encoded:", text_to_int(dev_oppo_hist))
 
 def int_to_text(ints):
   try:
@@ -60,16 +60,15 @@ def int_to_text(ints):
     pass
   return ''.join(idx2char[ints])
 
-print("int-to-text result: ", int_to_text(vocab_as_int))
-seq_length=1
-char_dataset = tf.data.Dataset.from_tensor_slices(vocab_as_int)
-BATCH_SIZE = 2;
-VOCAB_SIZE=len(vocab);
-EMBEDDING_DIM=256
+print("int-to-text result: ", int_to_text(dev_oppo_hist_as_int))
+seq_length=3
+char_dataset = tf.data.Dataset.from_tensor_slices(text_as_int)
+BATCH_SIZE = 3;
+EMBEDDING_DIM=128
 RNN_UNITS=128;
-BUFFER_SIZE=1000;
-sequences = char_dataset.batch(BATCH_SIZE);
-print("len of sequences: ",len(sequences))
+BUFFER_SIZE=500;
+data = char_dataset.batch(seq_length+1, drop_remainder=True)
+# print("len of sequences: ",len(sequences))
 # print(sequences[0:3])
 
 def split_input_target(chunk):
@@ -77,7 +76,9 @@ def split_input_target(chunk):
     target_text = chunk[2:]
     return input_text, target_text
 
-dataset = sequences.map(split_input_target)
+# dataset = sequences.map(split_input_target)
+# for batch in dataset:
+#     print(batch)
 # for x, y in dataset.take(5):
 #   print("\n\nEXAMPLE\n")
 #   print("INPUT")
@@ -85,8 +86,8 @@ dataset = sequences.map(split_input_target)
 #   print("\nOUTPUT")
 #   print(int_to_text(y))
 #   print(dataset)
-#
-data = dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE);
+# #
+# data = dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE);
 # for x, y in data.take(5):
 #   print("\n\nEXAMPLE\n")
 #   print("INPUT")
@@ -100,28 +101,33 @@ data = dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE);
 # guess = player("R", ["P"])
 # print(guess)
 ###Build Model
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
-    model_b = tf.keras.Sequential([
-        tf.keras.layers.Embedding(vocab_size, embedding_dim, input_shape=(batch_size,)),
-        # ( ) (vocab_size, embedding_dim,
-        #                            batch_input_shape=[batch_size, None]),
-        tf.keras.layers.LSTM(rnn_units,
-                             return_sequences=True,
-                             stateful=False,#stateful=True,
-                             recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dense(vocab_size ),
-    ])
+def build_model(vocab_size, rnn_units, batch_size):
+    inputShape = tf.keras.Input(shape=(vocab_size, batch_size))
+    model_b = tf.keras.Sequential()
+    model_b.add(inputShape)
+    model_b.add(tf.keras.layers.LSTM(rnn_units, activation="relu", return_sequences=True))
+    model_b.add(tf.keras.layers.LSTM(rnn_units, activation="relu",return_sequences=True))
+    model_b.add(tf.keras.layers.LSTM(int(rnn_units/4), activation="relu", return_sequences=False))
+    # model_b.add(tf.keras.layers.Dense(1))
+    # model_b.compile(optimizer='adam', loss = 'binary_crossentropy', metrics = ['accuracy', 'Precision', 'Recall'])
+    # model_b.fit(tf.expand_dims(data, 0), batch_size=batch_size, epochs=1)
     return model_b
 
-model = build_model(VOCAB_SIZE, EMBEDDING_DIM, RNN_UNITS, BATCH_SIZE)
+model = build_model(VOCAB_SIZE, RNN_UNITS, BATCH_SIZE)
 model.summary()
 
 ###Create Loss Function
 ##See Prediction
+# predData = data.unbatch()
+# data = predData.batch(BATCH_SIZE)
+for pd in data:
+    print("Tensor Data===>:",pd,"<=====|\n")
 for input_example_batch, target_example_batch in data.take(1):
-  example_batch_predictions = model(input_example_batch)  # ask our model for a prediction on our first batch of training data (64 entries)
-  print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_size)")  # print out the output shape
-  print(target_example_batch.shape, "# (batch_size, sequence_length, vocab_size)")
+    print("input: ",input_example_batch, "\n")
+    print("target: ", target_example_batch)
+    example_batch_predictions = model(input_example_batch)  # ask our model for a prediction on our first batch of training data (64 entries)
+    print(example_batch_predictions.shape, "# (batch_size, sequence_length, vocab_size)")  # print out the output shape
+    print(target_example_batch.shape, "# (batch_size, sequence_length, vocab_size)")
 
 
 pred = example_batch_predictions[0]
@@ -150,13 +156,13 @@ model.compile(optimizer='adam', loss=loss)
 checkpoint_dir = './training_checkpoints'
 # Name of the checkpoint files
 checkpoint_prefix = os.path.join(checkpoint_dir, "/", "ckpt_{epoch}.weights.h5")
-
+print(checkpoint_prefix)
 checkpoint_callback=tf.keras.callbacks.ModelCheckpoint(
     filepath=checkpoint_prefix,
     save_weights_only=True)
 
 ###Training
-history = model.fit(data, epochs=50, callbacks=[checkpoint_callback])
+history = model.fit(data, epochs=10, callbacks=[checkpoint_callback])
 
 ###Loading Model
 model = build_model(VOCAB_SIZE, EMBEDDING_DIM, RNN_UNITS, batch_size=1)
