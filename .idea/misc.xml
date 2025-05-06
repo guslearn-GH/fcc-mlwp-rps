@@ -4,4 +4,7 @@
     <option name="sdkName" value="fcc-mlwp-rps" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="fcc-mlwp-rps" project-jdk-type="Python SDK" />
+  <component name="PyPackaging">
+    <option name="earlyReleasesAsUpgrades" value="true" />
+  </component>
 </project>
